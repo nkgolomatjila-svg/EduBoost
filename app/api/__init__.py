@@ -1,0 +1,1 @@
+"""EduBoost SA FastAPI backend."""

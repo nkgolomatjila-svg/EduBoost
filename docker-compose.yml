@@ -1,0 +1,224 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# EduBoost SA — Docker Compose (Local Development Stack)
+# Usage: docker-compose up --build
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: eduboost-sa
+
+networks:
+  eduboost-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  grafana_data:
+  prometheus_data:
+
+services:
+
+  # ── FRONTEND: Next.js ──────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./app/frontend
+      dockerfile: ../../docker/Dockerfile.frontend
+      target: development
+    container_name: eduboost-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./app/frontend:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    depends_on:
+      - api
+    networks:
+      - eduboost-net
+    restart: unless-stopped
+
+  # ── BACKEND: FastAPI ───────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+      target: development
+    container_name: eduboost-api
+    working_dir: /workspace/app/api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/workspace/app
+    environment:
+      - APP_ENV=development
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379/0
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - SENTRY_DSN=${SENTRY_DSN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - eduboost-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── CELERY WORKER (Background tasks: RLHF, reports, emails) ───────────────
+  celery-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: eduboost-celery
+    command: celery -A app.api.core.celery_app worker --loglevel=info --concurrency=2
+    working_dir: /workspace/app/api
+    volumes:
+      - ./app:/workspace/app
+    environment:
+      - APP_ENV=development
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379/0
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - eduboost-net
+    restart: unless-stopped
+
+  # ── CELERY BEAT (Scheduled tasks: weekly RLHF batch, plan regeneration) ───
+  celery-beat:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: eduboost-beat
+    command: celery -A app.api.core.celery_app beat --loglevel=info
+    working_dir: /workspace/app/api
+    volumes:
+      - ./app:/workspace/app
+    environment:
+      - APP_ENV=development
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - eduboost-net
+    restart: unless-stopped
+
+  # ── POSTGRESQL ────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: eduboost-postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/db_init.sql:/docker-entrypoint-initdb.d/01_init.sql
+      - ./scripts/db_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
+      - ./scripts/db_audit_migration.sql:/docker-entrypoint-initdb.d/03_audit.sql
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-eduboost}
+      - POSTGRES_USER=${POSTGRES_USER:-eduboost_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-devpassword}
+    networks:
+      - eduboost-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eduboost_user} -d ${POSTGRES_DB:-eduboost}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── REDIS (Cache + Celery broker) ─────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: eduboost-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    networks:
+      - eduboost-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── PROMETHEUS (Metrics) ──────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: eduboost-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+    networks:
+      - eduboost-net
+    restart: unless-stopped
+
+  # ── GRAFANA (Dashboards) ──────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: eduboost-grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+    depends_on:
+      - prometheus
+    networks:
+      - eduboost-net
+    restart: unless-stopped
+
+  # ── FLOWER (Celery monitoring) ────────────────────────────────────────────
+  flower:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: eduboost-flower
+    command: celery -A app.api.core.celery_app flower --port=5555
+    working_dir: /workspace/app/api
+    ports:
+      - "5555:5555"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - celery-worker
+    networks:
+      - eduboost-net
+    restart: unless-stopped

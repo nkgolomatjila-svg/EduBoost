@@ -1,0 +1,39 @@
+# Non-authoritative legacy manifest.
+# Docker + GitLab CI is the supported delivery path for this repository.
+# This manifest is retained only as a reference and must not be treated as production-ready.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eduboost-api
+  labels: { app: eduboost-api }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: eduboost-api }
+  template:
+    metadata:
+      labels: { app: eduboost-api }
+    spec:
+      containers:
+        - name: api
+          image: eduboost/api:latest
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef: { name: eduboost-secrets }
+          livenessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 30
+          resources:
+            requests: { memory: "256Mi", cpu: "250m" }
+            limits: { memory: "512Mi", cpu: "500m" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eduboost-api-svc
+spec:
+  selector: { app: eduboost-api }
+  ports:
+    - port: 80
+      targetPort: 8000

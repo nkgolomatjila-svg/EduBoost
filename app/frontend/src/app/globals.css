@@ -1,0 +1,51 @@
+@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Baloo+2:wght@400;600;700;800&display=swap");
+
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f1923;--surface:#1a2535;--surface2:#243044;--border:rgba(255,255,255,0.08);--text:#e8f0fe;--muted:#8899aa;--gold:#FFD700;--green:#4ade80;--red:#f87171;--blue:#60a5fa;--orange:#fb923c;--purple:#c084fc;--radius:16px}
+body{font-family:"Nunito",sans-serif;background:var(--bg);color:var(--text)}
+.app{min-height:100vh;background:var(--bg);overflow-x:hidden}
+.stars-bg{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+.star{position:absolute;background:white;border-radius:50%;animation:twinkle var(--d,3s) ease-in-out infinite;opacity:var(--o,.4)}
+@keyframes twinkle{0%,100%{opacity:var(--o,.4);transform:scale(1)}50%{opacity:.1;transform:scale(.6)}}
+.flag-bar{height:4px;background:linear-gradient(to right,#007A4D 0%,#007A4D 16.6%,#FFB81C 16.6%,#FFB81C 33.3%,#DE3831 33.3%,#DE3831 50%,#002395 50%,#002395 66.6%,#fff 66.6%,#fff 83.3%,#000 83.3%,#000 100%)}
+.screen{position:relative;z-index:1;min-height:100vh}
+.landing{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;min-height:100vh;text-align:center}
+.logo-ring{width:100px;height:100px;background:linear-gradient(135deg,#FFD700,#FF6B6B);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:2.8rem;box-shadow:0 0 60px rgba(255,215,0,.4);margin-bottom:24px;animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.landing h1{font-family:"Baloo 2",cursive;font-size:clamp(2.2rem,6vw,3.5rem);font-weight:800;line-height:1;background:linear-gradient(135deg,#FFD700,#FF8E53);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.tagline{font-size:1rem;color:var(--muted);margin-bottom:40px;max-width:340px}
+.btn-primary{background:linear-gradient(135deg,#FFD700,#FF8E53);color:#0f1923;border:none;border-radius:50px;padding:16px 40px;font-family:"Nunito",sans-serif;font-size:1.1rem;font-weight:800;cursor:pointer;box-shadow:0 8px 30px rgba(255,215,0,.4);transition:transform .2s,box-shadow .2s}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(255,215,0,.5)}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1.5px solid var(--border);border-radius:50px;padding:12px 28px;font-family:"Nunito",sans-serif;font-size:.95rem;font-weight:700;cursor:pointer;transition:background .2s,border-color .2s}
+.btn-secondary:hover{background:var(--surface);border-color:var(--gold)}
+.onboarding{padding:32px 20px 40px;max-width:500px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+.step-indicator{display:flex;gap:8px;margin-bottom:32px}
+.step-dot{flex:1;height:4px;border-radius:4px;background:var(--surface2);transition:background .3s}
+.step-dot.active{background:var(--gold)}.step-dot.done{background:var(--green)}
+.onboard-title{font-family:"Baloo 2",cursive;font-size:1.8rem;font-weight:700;margin-bottom:8px}
+.onboard-sub{color:var(--muted);font-size:.95rem;margin-bottom:28px}
+.grade-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:32px}
+.grade-card{background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);padding:14px 8px;text-align:center;cursor:pointer;transition:all .2s}
+.grade-card:hover,.grade-card.selected{border-color:var(--gold)}
+.grade-card.selected{background:rgba(255,215,0,.1)}
+.grade-card .emoji{font-size:1.8rem;display:block;margin-bottom:4px}
+.grade-card .grade-name{font-weight:800;font-size:.75rem}
+.grade-card .grade-age{font-size:.65rem;color:var(--muted)}
+.avatar-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:32px}
+.avatar-btn{background:var(--surface);border:2px solid var(--border);border-radius:12px;padding:14px;font-size:1.6rem;cursor:pointer;text-align:center;transition:all .2s}
+.avatar-btn:hover,.avatar-btn.selected{border-color:var(--gold)}
+.avatar-btn.selected{background:rgba(255,215,0,.15);box-shadow:0 0 20px rgba(255,215,0,.3)}
+.name-input{width:100%;background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);padding:16px 20px;font-family:"Nunito";font-size:1rem;color:var(--text);outline:none;margin-bottom:24px;transition:border-color .2s}
+.name-input:focus{border-color:var(--gold)}.name-input::placeholder{color:var(--muted)}
+.main-layout{display:flex;min-height:100vh}
+.sidebar{width:240px;background:var(--surface);border-right:1px solid var(--border);padding:24px 0;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:10}
+.main-content{margin-left:240px;padding:28px;min-height:100vh;flex:1}
+.back-btn{background:none;border:1.5px solid var(--border);border-radius:50px;padding:10px 20px;color:var(--muted);font-family:"Nunito";font-weight:700;cursor:pointer;transition:all .2s;font-size:.88rem}
+.back-btn:hover{border-color:var(--gold);color:var(--text)}
+.btn-row{display:flex;gap:12px;flex-wrap:wrap}
+.popia-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3);color:var(--green);border-radius:8px;padding:6px 12px;font-size:.75rem;font-weight:700;margin-bottom:16px}
+.consent-form{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px}
+.checkbox-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);font-size:.88rem;line-height:1.5}
+.badge-popup{position:fixed;top:20px;right:20px;z-index:100;background:linear-gradient(135deg,#FFD700,#FF8E53);color:#0f1923;border-radius:16px;padding:16px 20px;font-weight:800;display:flex;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(255,215,0,.4);animation:slideIn .4s ease-out}
+@keyframes slideIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
+@media(max-width:768px){.sidebar{display:none}.main-content{margin-left:0;padding:16px}}

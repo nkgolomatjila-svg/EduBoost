@@ -1,0 +1,10 @@
+{
+  "title": "EduBoost SA — Application Metrics",
+  "uid": "eduboost-main",
+  "panels": [
+    { "title": "API Request Rate", "type": "graph", "targets": [{ "expr": "rate(http_requests_total[5m])" }] },
+    { "title": "Lesson Generation Latency (p95)", "type": "stat", "targets": [{ "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{handler='/api/v1/lessons/generate'}[5m]))" }] },
+    { "title": "LLM Provider Fallback Rate", "type": "stat", "targets": [{ "expr": "rate(llm_fallback_total[1h])" }] },
+    { "title": "Active Learners (last 24h)", "type": "stat", "targets": [{ "expr": "eduboost_active_learners_total" }] }
+  ]
+}

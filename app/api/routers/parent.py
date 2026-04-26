@@ -1,5 +1,6 @@
 """EduBoost SA — Parent Portal Router"""
 import hashlib
+from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
@@ -259,3 +260,37 @@ async def export_learner_data(learner_id: UUID, guardian_id: UUID):
             raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Export failed: {e}") from e
+
+
+@router.get("/right-to-access/{learner_id}/{guardian_id}")
+async def right_to_access(learner_id: UUID, guardian_id: UUID):
+    """
+    POPIA Right to Access endpoint.
+    
+    Returns a JSON export of all personal data stored about the learner.
+    Parents can use this to verify what data is collected and how it's used.
+    """
+    async with AsyncSessionFactory() as session:
+        try:
+            service = ParentPortalService(session)
+            data = await service.export_data(learner_id, guardian_id)
+            
+            # Add metadata about data collection
+            return {
+                "success": True,
+                "data": data,
+                "metadata": {
+                    "collection_date": datetime.now().isoformat(),
+                    "data_subject_id": str(learner_id),
+                    "popia_compliant": True,
+                    "data_controller": "EduBoost SA",
+                    "data_processor": "EduBoost Platform",
+                },
+                "instructions": "This is your complete personal data export. You have the right to request corrections or deletion.",
+            }
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Right-to-access request failed: {e}") from e

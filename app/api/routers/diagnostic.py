@@ -249,3 +249,117 @@ async def get_diagnostic_history(learner_id: uuid.UUID):
         })
     
     return {"learner_id": str(learner_id), "sessions": sessions, "count": len(sessions)}
+
+
+# ── Diagnostic Benchmarking Endpoints ─────────────────────────────────────────
+
+@router.get("/benchmark/metrics")
+async def get_diagnostic_benchmark_metrics(days: int = 30):
+    """
+    Get diagnostic engine benchmark metrics.
+    
+    Returns performance statistics including:
+    - Average session duration
+    - Accuracy metrics
+    - Standard error of measurement
+    - SLO compliance status
+    """
+    from app.api.services.diagnostic_benchmark_service import DiagnosticBenchmarkService
+    
+    async with AsyncSessionFactory() as session:
+        try:
+            service = DiagnosticBenchmarkService(session)
+            metrics = await service.get_benchmark_metrics(days=days)
+            
+            return {
+                "success": True,
+                "metrics": {
+                    "period_days": metrics.period_days,
+                    "total_sessions": metrics.total_sessions,
+                    "sessions_in_period": metrics.sessions_in_period,
+                    "avg_session_duration_ms": round(metrics.avg_session_duration_ms, 2),
+                    "p95_session_duration_ms": round(metrics.p95_session_duration_ms, 2),
+                    "min_session_duration_ms": round(metrics.min_session_duration_ms, 2),
+                    "max_session_duration_ms": round(metrics.max_session_duration_ms, 2),
+                    "avg_accuracy": round(metrics.avg_accuracy, 4),
+                    "min_accuracy": round(metrics.min_accuracy, 4),
+                    "max_accuracy": round(metrics.max_accuracy, 4),
+                    "avg_theta_sem": round(metrics.avg_theta_sem, 4),
+                    "avg_items_administered": metrics.avg_items_administered,
+                },
+                "slo_status": {
+                    "targets_met": metrics.targets_met,
+                    "violations": metrics.violations if metrics.violations else ["None - all SLOs met!"],
+                },
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Benchmark metrics failed: {e}") from e
+
+
+@router.get("/benchmark/report")
+async def get_diagnostic_benchmark_report(days: int = 30):
+    """
+    Get comprehensive diagnostic benchmark report.
+    
+    Includes overall metrics, per-subject performance, per-grade performance,
+    and SLO compliance status.
+    """
+    from app.api.services.diagnostic_benchmark_service import DiagnosticBenchmarkService
+    
+    async with AsyncSessionFactory() as session:
+        try:
+            service = DiagnosticBenchmarkService(session)
+            report = await service.generate_benchmark_report(days=days)
+            
+            return {
+                "success": True,
+                "report": report,
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Benchmark report failed: {e}") from e
+
+
+@router.get("/benchmark/by-subject")
+async def get_diagnostic_metrics_by_subject(days: int = 30):
+    """
+    Get diagnostic metrics broken down by subject.
+    
+    Useful for identifying which subject assessments may need calibration.
+    """
+    from app.api.services.diagnostic_benchmark_service import DiagnosticBenchmarkService
+    
+    async with AsyncSessionFactory() as session:
+        try:
+            service = DiagnosticBenchmarkService(session)
+            by_subject = await service.get_accuracy_by_subject(days=days)
+            
+            return {
+                "success": True,
+                "period_days": days,
+                "by_subject": by_subject,
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Subject metrics failed: {e}") from e
+
+
+@router.get("/benchmark/by-grade")
+async def get_diagnostic_metrics_by_grade(days: int = 30):
+    """
+    Get diagnostic metrics broken down by grade level.
+    
+    Useful for identifying grade-level trends in assessment performance.
+    """
+    from app.api.services.diagnostic_benchmark_service import DiagnosticBenchmarkService
+    
+    async with AsyncSessionFactory() as session:
+        try:
+            service = DiagnosticBenchmarkService(session)
+            by_grade = await service.get_accuracy_by_grade(days=days)
+            
+            return {
+                "success": True,
+                "period_days": days,
+                "by_grade": by_grade,
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Grade metrics failed: {e}") from e

@@ -79,3 +79,22 @@ async def refresh_study_plan(learner_id: UUID, gap_ratio: float = Field(default=
             raise HTTPException(status_code=404, detail=str(e)) from e
         except Exception as e:
             raise HTTPException(status_code=503, detail=f"Study plan refresh failed: {e}") from e
+
+
+@router.get("/{learner_id}/current/rationale")
+async def get_study_plan_rationale(learner_id: UUID):
+    """
+    Get the current study plan with rationale explanations for each task.
+    
+    This endpoint returns the study plan with detailed explanations for why
+    each task is included. Useful for educators and parents.
+    """
+    async with AsyncSessionFactory() as session:
+        try:
+            service = StudyPlanService(session)
+            plan_with_rationale = await service.get_plan_with_rationale(learner_id=learner_id)
+            return {"success": True, "plan": plan_with_rationale}
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"Failed to get plan rationale: {e}") from e

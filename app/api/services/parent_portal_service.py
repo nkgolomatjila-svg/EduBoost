@@ -345,3 +345,150 @@ class ParentPortalService:
                 status_code=403,
                 detail="Guardian consent has been revoked",
             )
+
+    async def export_data(
+        self,
+        learner_id: UUID,
+        guardian_id: UUID,
+    ) -> dict:
+        """
+        Export all learner data in machine-readable format (POPIA right to access).
+        
+        Returns a comprehensive JSON export of the learner's data.
+        """
+        # Verify guardian access
+        await self._verify_guardian_access(learner_id, guardian_id)
+
+        # Get learner record
+        learner = await self.session.get(Learner, learner_id)
+        if not learner:
+            raise ValueError(f"Learner {learner_id} not found")
+
+        # Get PII record (for guardian access)
+        result = await self.session.execute(
+            select(LearnerIdentity).where(LearnerIdentity.pseudonym_id == learner_id)
+        )
+        learner_identity = result.scalar_one_or_none()
+
+        # Get subject mastery data
+        result = await self.session.execute(
+            select(SubjectMastery).where(SubjectMastery.learner_id == learner_id)
+        )
+        subject_mastery_records = result.scalars().all()
+
+        # Get session events
+        result = await self.session.execute(
+            select(SessionEvent)
+            .where(SessionEvent.learner_id == learner_id)
+            .order_by(SessionEvent.occurred_at.desc())
+        )
+        session_events = result.scalars().all()
+
+        # Get diagnostic sessions
+        result = await self.session.execute(
+            select(DiagnosticSession)
+            .where(DiagnosticSession.learner_id == learner_id)
+            .order_by(DiagnosticSession.completed_at.desc())
+        )
+        diagnostic_sessions = result.scalars().all()
+
+        # Get study plans
+        result = await self.session.execute(
+            select(StudyPlan)
+            .where(StudyPlan.learner_id == learner_id)
+            .order_by(StudyPlan.created_at.desc())
+        )
+        study_plans = result.scalars().all()
+
+        # Get consent audit trail
+        result = await self.session.execute(
+            select(ConsentAudit)
+            .where(ConsentAudit.pseudonym_id == learner_id)
+            .order_by(ConsentAudit.occurred_at.desc())
+        )
+        consent_records = result.scalars().all()
+
+        # Build comprehensive export
+        export_data = {
+            "export_date": datetime.now().isoformat(),
+            "export_purpose": "POPIA Right to Access",
+            "learner_id": str(learner_id),
+            "learner_profile": {
+                "grade": learner.grade,
+                "home_language": learner.home_language,
+                "avatar_id": learner.avatar_id,
+                "learning_style": learner.learning_style,
+                "overall_mastery": learner.overall_mastery,
+                "streak_days": learner.streak_days,
+                "total_xp": learner.total_xp,
+                "created_at": learner.created_at.isoformat(),
+                "last_active_at": learner.last_active_at.isoformat(),
+            },
+            "subject_mastery": [
+                {
+                    "subject_code": sm.subject_code,
+                    "grade_level": sm.grade_level,
+                    "mastery_score": sm.mastery_score,
+                    "concepts_mastered": sm.concepts_mastered or [],
+                    "concepts_in_progress": sm.concepts_in_progress or [],
+                    "knowledge_gaps": sm.knowledge_gaps or [],
+                    "last_assessed_at": sm.last_assessed_at.isoformat() if sm.last_assessed_at else None,
+                    "updated_at": sm.updated_at.isoformat(),
+                }
+                for sm in subject_mastery_records
+            ],
+            "session_events": [
+                {
+                    "event_id": str(se.event_id),
+                    "session_id": str(se.session_id),
+                    "lesson_id": se.lesson_id,
+                    "event_type": se.event_type,
+                    "content_modality": se.content_modality,
+                    "is_correct": se.is_correct,
+                    "time_on_task_ms": se.time_on_task_ms,
+                    "difficulty_level": se.difficulty_level,
+                    "post_mastery_delta": se.post_mastery_delta,
+                    "lesson_efficacy_score": se.lesson_efficacy_score,
+                    "occurred_at": se.occurred_at.isoformat(),
+                }
+                for se in session_events
+            ],
+            "diagnostic_sessions": [
+                {
+                    "session_id": str(ds.session_id),
+                    "subject_code": ds.subject_code,
+                    "grade_level": ds.grade_level,
+                    "theta_estimate": ds.theta_estimate,
+                    "sem": ds.sem,
+                    "final_mastery_score": ds.final_mastery_score,
+                    "items_administered": ds.items_administered,
+                    "items_correct": ds.items_correct,
+                    "knowledge_gaps": ds.knowledge_gaps or [],
+                    "started_at": ds.started_at.isoformat(),
+                    "completed_at": ds.completed_at.isoformat() if ds.completed_at else None,
+                }
+                for ds in diagnostic_sessions
+            ],
+            "study_plans": [
+                {
+                    "plan_id": str(sp.plan_id),
+                    "week_start": sp.week_start.isoformat(),
+                    "schedule": sp.schedule,
+                    "gap_ratio": sp.gap_ratio,
+                    "week_focus": sp.week_focus,
+                    "generated_by": sp.generated_by,
+                    "created_at": sp.created_at.isoformat(),
+                }
+                for sp in study_plans
+            ],
+            "consent_history": [
+                {
+                    "event_type": ca.event_type,
+                    "consent_version": ca.consent_version,
+                    "occurred_at": ca.occurred_at.isoformat(),
+                }
+                for ca in consent_records
+            ],
+        }
+
+        return export_data

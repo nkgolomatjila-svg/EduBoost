@@ -337,3 +337,89 @@ class StudyPlanService:
             subjects_mastery=subjects_mastery,
             gap_ratio=gap_ratio,
         )
+
+    def _generate_task_rationale(self, task: dict, subjects_mastery: dict[str, float], knowledge_gaps: list[str]) -> str:
+        """
+        Generate a human-readable rationale for why a task is in the plan.
+        
+        This explains to educators and parents WHY each task is included.
+        """
+        task_type = task.get("type", "unknown")
+        subject = task.get("subject", "")
+        concept = task.get("concept", "")
+        
+        if task_type == "remediation":
+            # Task is remediating a knowledge gap
+            mastery = subjects_mastery.get(subject, 0)
+            gap_reason = f"This concept is identified as a knowledge gap (current mastery: {int(mastery*100)}%)"
+            
+            if mastery < 0.4:
+                level = "significant weakness"
+            elif mastery < 0.6:
+                level = "area for improvement"
+            else:
+                level = "minor gap"
+            
+            return f"Remediation task: {concept.replace('_', ' ').title()} is a {level} in {CAPS_SUBJECTS.get(subject, {}).get('name', subject)}. {gap_reason}. Targeted practice will strengthen this foundation."
+        
+        elif task_type == "lesson":
+            # Task is advancing grade-level content
+            return f"Grade-level advancement: Introducing {concept.replace('_', ' ').title()} in {CAPS_SUBJECTS.get(subject, {}).get('name', subject)}. This aligns with Grade {task.get('grade', 'current')} CAPS curriculum pacing."
+        
+        elif task_type == "assessment":
+            # Task is a diagnostic/assessment
+            return f"Assessment: This diagnostic in {concept} will help us identify your current level and personalize future lessons."
+        
+        elif task_type == "review":
+            # Task is review/consolidation
+            return f"Review and consolidation: Reinforcing {concept.replace('_', ' ').title()} to build automaticity and confidence."
+        
+        else:
+            return f"Complete this {concept.replace('_', ' ').title()} task in {subject} to progress in your learning journey."
+
+    async def get_plan_with_rationale(
+        self,
+        learner_id: UUID,
+    ) -> dict:
+        """
+        Get the current study plan with rationale explanations for each task.
+        
+        This is useful for educators and parents who need to understand
+        why tasks are assigned.
+        """
+        plan = await self.get_current_plan(learner_id)
+        if not plan:
+            raise ValueError(f"No active study plan for learner {learner_id}")
+
+        # Get subject mastery for context
+        subjects_mastery = await self._get_subject_mastery(learner_id)
+        knowledge_gaps = await self._get_knowledge_gaps(learner_id)
+
+        # Add rationale to each task
+        schedule_with_rationale = {}
+        for day, tasks in (plan.schedule or {}).items():
+            schedule_with_rationale[day] = []
+            for task in tasks:
+                rationale = self._generate_task_rationale(
+                    task=task,
+                    subjects_mastery=subjects_mastery,
+                    knowledge_gaps=knowledge_gaps,
+                )
+                schedule_with_rationale[day].append({
+                    **task,
+                    "rationale": rationale,
+                })
+
+        return {
+            "plan_id": str(plan.plan_id),
+            "learner_id": str(learner_id),
+            "week_start": plan.week_start.isoformat(),
+            "week_focus": plan.week_focus,
+            "week_focus_rationale": f"This week focuses on {plan.week_focus.lower()}. This targets your strongest gaps while maintaining grade-level pace.",
+            "gap_ratio": plan.gap_ratio,
+            "remediation_percentage": int(plan.gap_ratio * 100),
+            "advancement_percentage": int((1 - plan.gap_ratio) * 100),
+            "schedule_with_rationale": schedule_with_rationale,
+            "generated_by": plan.generated_by,
+            "created_at": plan.created_at.isoformat(),
+        }

@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 import structlog
 
 from app.api.core.config import settings
-from app.api.routers import health, learners, lessons, diagnostic, study_plans, parent, auth, system, gamification
+from app.api.routers import health, learners, lessons, diagnostic, study_plans, parent, auth, system, gamification, audit
 
 log = structlog.get_logger()
 
@@ -127,4 +127,5 @@ app.include_router(diagnostic.router, prefix="/api/v1/diagnostic", tags=["Diagno
 app.include_router(study_plans.router, prefix="/api/v1/study-plans", tags=["Study Plans"])
 app.include_router(parent.router, prefix="/api/v1/parent", tags=["Parent Portal"])
 app.include_router(gamification.router, prefix="/api/v1/gamification", tags=["Gamification"])
+app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit"])
 app.include_router(system.router, prefix="/api/v1/system", tags=["System"])
